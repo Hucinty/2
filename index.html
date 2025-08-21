@@ -3,366 +3,173 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Real‑Time Person Cutout — Green Screen Effect (HTML)</title>
+  <title>Real‑Time Person Cutout — Full Green Screen Studio</title>
   <style>
-    :root{
-      --bg:#0b1220; --panel:#11182a; --soft:#18213a; --hi:#6be675; --text:#e8f0ff;
-      --muted:#9fb3c8; --danger:#ff6b6b;
-    }
-    *{box-sizing:border-box}
-    html,body{height:100%}
-    body{
-      margin:0; background: radial-gradient(1200px 600px at 20% -10%, #182341 0%, #0b1220 40%), linear-gradient(180deg, #0b1220, #0a0f1c);
-      color:var(--text); font-family: system-ui, -apple-system, Segoe UI, Roboto, Ubuntu, "Helvetica Neue", Arial, "Noto Sans", "Apple Color Emoji", "Segoe UI Emoji";
-    }
-    header{ display:flex; align-items:center; gap:12px; padding:14px 16px; background:linear-gradient(180deg,#10182a,#0d1426); position:sticky; top:0; z-index:10; box-shadow:0 6px 20px rgba(0,0,0,.25)}
-    header h1{font-size:18px; margin:0; letter-spacing:.3px; font-weight:650}
-    header .pill{padding:4px 8px; border-radius:999px; background:#0f1a33; color:#b7c7e3; font-size:12px}
-
-    .layout{display:grid; grid-template-columns:360px 1fr; gap:16px; padding:16px; height:calc(100% - 60px)}
-    @media (max-width: 980px){.layout{grid-template-columns:1fr; grid-auto-rows:min-content}}
-
-    .panel{background:var(--panel); border:1px solid #1a2747; border-radius:16px; box-shadow:0 20px 60px rgba(0,0,0,.35)}
-    .controls{padding:14px; display:flex; flex-direction:column; gap:12px}
-    .row{display:flex; gap:8px; align-items:center; flex-wrap:wrap}
-    .row > label{min-width:120px; font-size:13px; color:var(--muted)}
-    .row .grow{flex:1}
-    .subtle{font-size:12px; color:#9fb3c8}
-    .btn{appearance:none; border:none; padding:10px 14px; border-radius:12px; font-weight:600; color:#0a1220; background:var(--hi); cursor:pointer}
-    .btn.secondary{background:#1e2b4e; color:#dbe8ff; border:1px solid #2a3b6b}
-    .btn.ghost{background:transparent; color:#cfe1ff; border:1px dashed #2a3b6b}
-    .btn:disabled{opacity:.6; cursor:not-allowed}
-    input[type="range"]{width:100%}
-    select, input[type="file"], input[type="color"]{
-      padding:10px; border-radius:12px; background:#101a33; color:#d6e6ff; border:1px solid #26355e
-    }
-
-    .stage{position:relative; overflow:hidden; border-radius:16px; height: min(72vh, 800px); display:grid; grid-template-rows:auto 1fr}
-    .stage header{position:sticky; top:0; border-bottom:1px solid #1a2747; border-radius:16px 16px 0 0}
-    .canvas-wrap{position:relative; height:100%; background:#0a1220}
-    canvas{position:absolute; inset:0; width:100%; height:100%; image-rendering: auto}
-    video{position:absolute; inset:0; width:0; height:0; opacity:0; pointer-events:none}
-
-    .badnews{padding:12px; background:#3a1320; border:1px solid #5a1a2f; color:#ffc6d1; border-radius:12px}
-    .oknews{padding:10px; background:#0f1f39; border:1px solid #1c2d54; color:#cfe1ff; border-radius:12px}
-    .footer{padding:10px 14px; display:flex; gap:10px; justify-content:space-between; align-items:center; border-top:1px solid #1a2747; background:#0f1730; border-radius:0 0 16px 16px}
-    .right{display:flex; gap:8px; align-items:center}
+    body { margin: 0; background: #0b1220; color: white; font-family: sans-serif; }
+    .rotated video, .rotated canvas { transform: rotate(180deg); }
+    header { padding: 10px; background: #11182a; position: sticky; top: 0; }
+    header h1 { margin: 0; font-size: 18px; }
+    .controls { padding: 10px; background: #11182a; display: flex; flex-wrap: wrap; align-items: center; }
+    .stage { display: flex; justify-content: center; align-items: center; padding: 10px; }
+    .canvas-wrap { position: relative; max-width: 100%; height: auto; }
+    canvas { position: absolute; inset: 0; }
+    video { display: none; }
+    button, select, input { margin: 5px; padding: 8px 12px; border: none; border-radius: 6px; cursor: pointer; background: #1c2640; color: white; }
+    button:disabled, select:disabled { opacity: 0.5; }
   </style>
 </head>
 <body>
-  <header>
-    <h1>Real‑Time Person Detect & Cutout</h1>
-    <span class="pill">Green‑Screen Style • On‑device</span>
-  </header>
-
-  <section class="layout">
-    <!-- Controls -->
-    <aside class="panel">
-      <div class="controls">
-        <div class="oknews" id="status">Initializing model…</div>
-
-        <div class="row">
-          <label>Camera</label>
-          <div class="right">
-            <button id="btnStart" class="btn">Start</button>
-            <button id="btnSwitch" class="btn secondary" disabled>Switch</button>
-          </div>
-        </div>
-
-        <div class="row">
-          <label>Output Mode</label>
-          <select id="mode" class="grow">
-            <option value="composite" selected>Composite (replace background)</option>
-            <option value="cutout">Person only (transparent PNG)</option>
-          </select>
-        </div>
-
-        <div class="row">
-          <label>Background</label>
-          <select id="bgKind" class="grow">
-            <option value="color" selected>Solid Color</option>
-            <option value="transparent">Transparent</option>
-            <option value="blur">Blur Camera</option>
-            <option value="image">Custom Image</option>
-          </select>
-        </div>
-
-        <div class="row" id="bgColorRow">
-          <label>BG Color</label>
-          <input type="color" id="bgColor" value="#16233f"/>
-        </div>
-
-        <div class="row" id="bgImgRow" style="display:none">
-          <label>BG Image</label>
-          <input type="file" id="bgImage" accept="image/*"/>
-        </div>
-
-        <div class="row" id="blurRow" style="display:none">
-          <label>Blur Strength</label>
-          <input type="range" id="blurStrength" min="0" max="30" value="12"/>
-        </div>
-
-        <div class="row">
-          <label>Quality</label>
-          <input type="range" id="scale" min="0.5" max="1.0" value="1" step="0.05"/>
-        </div>
-
-        <div class="row">
-          <label>Smoothing</label>
-          <input type="range" id="smooth" min="0" max="1" value="0.6" step="0.05"/>
-        </div>
-
-        <div class="row">
-          <label>Download</label>
-          <div class="right">
-            <button id="btnSnap" class="btn secondary" disabled>Snapshot PNG</button>
-          </div>
-        </div>
-
-        <div class="subtle">Tip: For a crisper edge, keep your background uniform and well‑lit. Works best with one person in view.</div>
-      </div>
-    </aside>
-
-    <!-- Stage -->
-    <main class="panel stage">
-      <header class="row" style="background:transparent">
-        <div>Preview</div>
-        <div class="right subtle" id="info">—</div>
-      </header>
-      <div class="canvas-wrap">
-        <video id="video" playsinline muted></video>
-        <!-- Person‑only transparent cutout -->
-        <canvas id="cutout"></canvas>
-        <!-- Composite (background replaced) -->
-        <canvas id="output"></canvas>
-      </div>
-      <div class="footer">
-        <div id="warn" class="subtle"></div>
-        <div class="right">
-          <span class="subtle">Model: MediaPipe Selfie Segmentation</span>
-        </div>
-      </div>
-    </main>
-  </section>
-
-  <!-- MediaPipe libraries from CDN -->
+  <header><h1>Real‑Time Person Detect — Full Green Screen Studio</h1></header>
+  <div class="controls">
+    <button id="btnStart">Start</button>
+    <button id="btnSwitch" disabled>Switch Camera</button>
+    <button id="btnRotate" disabled>Rotate 180°</button>
+    <button id="btnSnapshot" disabled>Snapshot</button>
+    <button id="btnRecord" disabled>Start Recording</button>
+    <select id="bgMode" disabled>
+      <option value="transparent">Transparent</option>
+      <option value="color">Solid Color</option>
+      <option value="blur">Blur</option>
+      <option value="image">Custom Image</option>
+    </select>
+    <input type="color" id="bgColor" value="#00ff00" style="display:none;">
+    <input type="file" id="bgImage" accept="image/*" style="display:none;">
+    <span id="status">Initializing model…</span>
+  </div>
+  <div class="stage">
+    <div class="canvas-wrap">
+      <video id="video" playsinline muted></video>
+      <canvas id="output"></canvas>
+    </div>
+  </div>
   <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/@mediapipe/selfie_segmentation/selfie_segmentation.js"></script>
-
   <script>
-    const els = {
-      status: document.getElementById('status'),
-      info: document.getElementById('info'),
-      warn: document.getElementById('warn'),
-      video: document.getElementById('video'),
-      output: document.getElementById('output'),
-      cutout: document.getElementById('cutout'),
-      btnStart: document.getElementById('btnStart'),
-      btnSwitch: document.getElementById('btnSwitch'),
-      btnSnap: document.getElementById('btnSnap'),
-      mode: document.getElementById('mode'),
-      bgKind: document.getElementById('bgKind'),
-      bgColor: document.getElementById('bgColor'),
-      bgImgRow: document.getElementById('bgImgRow'),
-      bgColorRow: document.getElementById('bgColorRow'),
-      blurRow: document.getElementById('blurRow'),
-      bgImage: document.getElementById('bgImage'),
-      blurStrength: document.getElementById('blurStrength'),
-      scale: document.getElementById('scale'),
-      smooth: document.getElementById('smooth'),
+    const body = document.body;
+    const videoElement = document.getElementById('video');
+    const outputCanvas = document.getElementById('output');
+    const statusEl = document.getElementById('status');
+    const btnStart = document.getElementById('btnStart');
+    const btnSwitch = document.getElementById('btnSwitch');
+    const btnRotate = document.getElementById('btnRotate');
+    const btnSnapshot = document.getElementById('btnSnapshot');
+    const btnRecord = document.getElementById('btnRecord');
+    const bgMode = document.getElementById('bgMode');
+    const bgColor = document.getElementById('bgColor');
+    const bgImageInput = document.getElementById('bgImage');
+
+    let currentFacing = 'user';
+    let camera;
+    let bgImg = null;
+    let recorder, recordedChunks = [];
+
+    const selfieSegmentation = new SelfieSegmentation({
+      locateFile: file => `https://cdn.jsdelivr.net/npm/@mediapipe/selfie_segmentation/${file}`
+    });
+    selfieSegmentation.setOptions({ modelSelection: 1 });
+
+    selfieSegmentation.onResults(results => {
+      if (!videoElement.videoWidth || !videoElement.videoHeight) return;
+      outputCanvas.width = videoElement.videoWidth;
+      outputCanvas.height = videoElement.videoHeight;
+
+      const ctxOut = outputCanvas.getContext('2d');
+      const mask = results.segmentationMask;
+      ctxOut.clearRect(0, 0, outputCanvas.width, outputCanvas.height);
+
+      const mode = bgMode.value;
+      if (mode === 'color') {
+        ctxOut.fillStyle = bgColor.value;
+        ctxOut.fillRect(0, 0, outputCanvas.width, outputCanvas.height);
+      } else if (mode === 'blur') {
+        ctxOut.filter = 'blur(10px)';
+        ctxOut.drawImage(results.image, 0, 0, outputCanvas.width, outputCanvas.height);
+        ctxOut.filter = 'none';
+      } else if (mode === 'image' && bgImg) {
+        ctxOut.drawImage(bgImg, 0, 0, outputCanvas.width, outputCanvas.height);
+      }
+
+      ctxOut.globalCompositeOperation = 'destination-in';
+      ctxOut.drawImage(mask, 0, 0, outputCanvas.width, outputCanvas.height);
+      ctxOut.globalCompositeOperation = 'destination-over';
+      if (mode === 'transparent') {
+        ctxOut.clearRect(0, 0, outputCanvas.width, outputCanvas.height);
+      }
+      ctxOut.drawImage(results.image, 0, 0, outputCanvas.width, outputCanvas.height);
+      ctxOut.globalCompositeOperation = 'source-over';
+    });
+
+    btnStart.onclick = async () => {
+      if (camera) camera.stop();
+      const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: currentFacing } });
+      videoElement.srcObject = stream;
+      await videoElement.play();
+      camera = new Camera(videoElement, {
+        onFrame: async () => {
+          await selfieSegmentation.send({ image: videoElement });
+        },
+        width: videoElement.videoWidth,
+        height: videoElement.videoHeight
+      });
+      camera.start();
+      btnSwitch.disabled = false;
+      btnRotate.disabled = false;
+      btnSnapshot.disabled = false;
+      btnRecord.disabled = false;
+      bgMode.disabled = false;
+      statusEl.textContent = 'Running…';
     };
 
-    let currentFacing = 'user'; // 'user' (front) or 'environment' (back)
-    let camera = null;
-    let selfie = null;
-    let running = false;
-    let bgBitmap = null;
-
-    function setStatus(msg, good=true){
-      els.status.className = good ? 'oknews' : 'badnews';
-      els.status.textContent = msg;
-    }
-
-    function fitCanvasToParent(canvas){
-      const wrap = canvas.parentElement;
-      const r = wrap.getBoundingClientRect();
-      canvas.width = Math.round(r.width * parseFloat(els.scale.value));
-      canvas.height = Math.round(r.height * parseFloat(els.scale.value));
-    }
-
-    function updateControlVisibility(){
-      const kind = els.bgKind.value;
-      els.bgColorRow.style.display = kind === 'color' ? '' : 'none';
-      els.bgImgRow.style.display = kind === 'image' ? '' : 'none';
-      els.blurRow.style.display = kind === 'blur' ? '' : 'none';
-
-      const showCutout = els.mode.value === 'cutout';
-      els.cutout.style.display = showCutout ? 'block' : 'none';
-      els.output.style.display = showCutout ? 'none' : 'block';
-    }
-
-    window.addEventListener('resize', () => {
-      fitCanvasToParent(els.output);
-      fitCanvasToParent(els.cutout);
-    });
-
-    els.scale.addEventListener('input', () => {
-      fitCanvasToParent(els.output);
-      fitCanvasToParent(els.cutout);
-    });
-
-    els.mode.addEventListener('change', updateControlVisibility);
-    els.bgKind.addEventListener('change', updateControlVisibility);
-
-    els.bgImage.addEventListener('change', async (e) => {
-      const file = e.target.files?.[0];
-      if(!file) return;
-      const bmp = await createImageBitmap(file);
-      bgBitmap = bmp;
-    });
-
-    els.btnSwitch.addEventListener('click', async () => {
+    btnSwitch.onclick = () => {
       currentFacing = currentFacing === 'user' ? 'environment' : 'user';
-      await startCamera();
-    });
+      btnStart.click();
+    };
 
-    els.btnSnap.addEventListener('click', () => {
-      const c = els.mode.value === 'cutout' ? els.cutout : els.output;
-      c.toBlob((blob) => {
-        const a = document.createElement('a');
-        a.download = 'person-cutout.png';
-        a.href = URL.createObjectURL(blob);
-        a.click();
-        URL.revokeObjectURL(a.href);
-      });
-    });
+    btnRotate.onclick = () => {
+      body.classList.toggle('rotated');
+    };
 
-    async function startCamera(){
-      try{
-        // Stop previous stream if any
-        if(els.video.srcObject){
-          const tracks = els.video.srcObject.getTracks();
-          tracks.forEach(t => t.stop());
-        }
+    btnSnapshot.onclick = () => {
+      const link = document.createElement('a');
+      link.download = 'snapshot.png';
+      link.href = outputCanvas.toDataURL('image/png');
+      link.click();
+    };
 
-        const stream = await navigator.mediaDevices.getUserMedia({
-          audio:false,
-          video:{ facingMode: { ideal: currentFacing }, width:{ideal:1280}, height:{ideal:720} }
-        });
-        els.video.srcObject = stream;
-        await els.video.play();
-
-        fitCanvasToParent(els.output);
-        fitCanvasToParent(els.cutout);
-
-        // (Re)create Camera helper
-        if(camera) { camera.stop(); }
-        camera = new Camera(els.video, {
-          onFrame: async () => {
-            if(selfie) await selfie.send({ image: els.video });
-          },
-          width: els.output.width,
-          height: els.output.height,
-        });
-        camera.start();
-
-        els.btnSwitch.disabled = false;
-        els.btnSnap.disabled = false;
-        running = true;
-        setStatus('Camera running — segmentation active');
-      }catch(err){
-        console.error(err);
-        setStatus('Camera error: ' + (err.message || err), false);
-        els.warn.textContent = 'If you denied camera permission, allow it in your browser settings and reload.';
+    btnRecord.onclick = () => {
+      if (!recorder) {
+        recordedChunks = [];
+        recorder = new MediaRecorder(outputCanvas.captureStream());
+        recorder.ondataavailable = e => { if (e.data.size > 0) recordedChunks.push(e.data); };
+        recorder.onstop = () => {
+          const blob = new Blob(recordedChunks, { type: 'video/webm' });
+          const link = document.createElement('a');
+          link.href = URL.createObjectURL(blob);
+          link.download = 'recording.webm';
+          link.click();
+        };
+        recorder.start();
+        btnRecord.textContent = 'Stop Recording';
+      } else {
+        recorder.stop();
+        recorder = null;
+        btnRecord.textContent = 'Start Recording';
       }
-    }
+    };
 
-    function coverDraw(ctx, img, w, h){
-      // Draw image to cover canvas while preserving aspect
-      const iw = img.width || w, ih = img.height || h;
-      const ir = iw/ih, cr = w/h;
-      let dw=w, dh=h, dx=0, dy=0;
-      if(ir > cr){ // image wider
-        dh = h; dw = h*ir; dx = (w - dw)/2; dy = 0;
-      } else { // taller
-        dw = w; dh = w/ir; dx = 0; dy = (h - dh)/2;
+    bgMode.onchange = () => {
+      bgColor.style.display = bgMode.value === 'color' ? 'inline-block' : 'none';
+      bgImageInput.style.display = bgMode.value === 'image' ? 'inline-block' : 'none';
+    };
+
+    bgImageInput.onchange = e => {
+      const file = e.target.files[0];
+      if (file) {
+        const img = new Image();
+        img.onload = () => { bgImg = img; };
+        img.src = URL.createObjectURL(file);
       }
-      ctx.drawImage(img, dx, dy, dw, dh);
-    }
-
-    function onResults(res){
-      const {width, height} = els.output;
-
-      // CUTOUT (transparent background)
-      const cut = els.cutout.getContext('2d');
-      cut.save();
-      cut.clearRect(0,0,width,height);
-      // 1) draw segmentation mask
-      cut.globalCompositeOperation = 'copy';
-      cut.filter = `blur(${(1-parseFloat(els.smooth.value))*2}px)`; // slight softness if smoothing low
-      coverDraw(cut, res.segmentationMask, width, height);
-      cut.filter = 'none';
-      // 2) keep only person
-      cut.globalCompositeOperation = 'source-in';
-      coverDraw(cut, els.video, width, height);
-      cut.restore();
-
-      // COMPOSITE (replace background)
-      const ctx = els.output.getContext('2d');
-      ctx.save();
-      ctx.clearRect(0,0,width,height);
-
-      const bgKind = els.bgKind.value;
-      if(bgKind === 'transparent'){
-        // leave transparent
-      } else if(bgKind === 'color'){
-        ctx.fillStyle = els.bgColor.value;
-        ctx.fillRect(0,0,width,height);
-      } else if(bgKind === 'blur'){
-        ctx.filter = `blur(${parseInt(els.blurStrength.value,10)}px)`;
-        coverDraw(ctx, els.video, width, height);
-        ctx.filter = 'none';
-      } else if(bgKind === 'image'){
-        if(bgBitmap) coverDraw(ctx, bgBitmap, width, height);
-        else { ctx.fillStyle = '#111a33'; ctx.fillRect(0,0,width,height); }
-      }
-
-      // Bring person back in
-      ctx.globalCompositeOperation = 'destination-over';
-      coverDraw(ctx, els.video, width, height); // in case of transparent we still keep video under
-      ctx.globalCompositeOperation = 'source-over';
-      ctx.drawImage(els.cutout, 0, 0); // paste person
-
-      ctx.restore();
-
-      // FPS / size info
-      els.info.textContent = `${width}×${height} • ${bgKind} • ${els.mode.value}`;
-    }
-
-    async function init(){
-      updateControlVisibility();
-      // Init MediaPipe SelfieSegmentation
-      selfie = new SelfieSegmentation({locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/selfie_segmentation/${file}`});
-      selfie.setOptions({
-        modelSelection: 1, // 0: general, 1: landscape
-        selfieMode: true,
-        enableSegmentationSmoothing: true,
-      });
-      selfie.onResults(onResults);
-
-      setStatus('Model ready. Click Start to begin.');
-
-      els.btnStart.addEventListener('click', async ()=>{
-        if(!running) await startCamera();
-      });
-
-      // Kick off automatically on user gesture (mobile may require explicit)
-      document.body.addEventListener('keydown', async (e)=>{
-        if(e.key === ' ' && !running){ await startCamera(); }
-      }, {once:false});
-    }
-
-    init();
+    };
   </script>
 </body>
 </html>
